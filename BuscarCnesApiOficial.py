@@ -13,18 +13,25 @@ def ler_codigos_cnes(caminho_csv):
         codigos = conteudo.strip().split(',')
     return codigos
 
-def requisicao_cnes(codigo_cnes):
-    url = f'https://apidadosabertos.saude.gov.br/cnes/estabelecimentos/{codigo_cnes}'
-    headers = {'accept': 'application/json'}
-    try:
-        response = requests.get(url, headers=headers, timeout=10)
-        if response.status_code == 200:
-            return response.json()
-        else:
-            print(f'Erro ao consultar CNES {codigo_cnes}: {response.status_code}')
-            return None
-    except Exception as e:
-        print(f'Erro na requisição CNES {codigo_cnes}: {e}')
+def requisicao_cnes(codigo_cnes, max_retries=3):
+        url = f'https://apidadosabertos.saude.gov.br/cnes/estabelecimentos/{codigo_cnes}'
+        headers = {'accept': 'application/json'}
+        
+        for tentativa in range(max_retries):
+            try:
+                response = requests.get(url, headers=headers, timeout=30)
+                if response.status_code == 200:
+                    return response.json()
+                elif response.status_code == 404:
+                    print(f'CNES {codigo_cnes} não encontrado')
+                    return None
+                else:
+                    print(f'Erro HTTP {response.status_code} para CNES {codigo_cnes}')
+            except requests.exceptions.RequestException as e:
+                print(f'Tentativa {tentativa + 1} falhou para CNES {codigo_cnes}: {e}')
+                if tentativa < max_retries - 1:
+                    time.sleep(2)  # Aguardar antes de tentar novamente
+                
         return None
 
 def consultar_lista_cnes_api(lista_codigos, pasta_downloads='downloads', max_workers=20, caminho_csv=None):
@@ -40,8 +47,9 @@ def consultar_lista_cnes_api(lista_codigos, pasta_downloads='downloads', max_wor
     total = len(lista_codigos)
     sucesso = 0
     erro = 0
+    max_retries = 3  # Número de tentativas para cada requisição
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        future_to_codigo = {executor.submit(requisicao_cnes, codigo): codigo for codigo in lista_codigos}
+        future_to_codigo = {executor.submit(requisicao_cnes, codigo, max_retries): codigo for codigo in lista_codigos}
         for future in as_completed(future_to_codigo):
             resultado = future.result()
             if resultado:

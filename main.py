@@ -1,35 +1,46 @@
 import subprocess
+import sys
+import os
 
 def executar_script(script):
-	try:
-		resultado = subprocess.run([
-			'python', script
-		], check=True)
-		return resultado.returncode == 0
-	except Exception as e:
-		print(f"Erro ao executar {script}: {e}")
-		return False
+    try:
+        print(f"Executando: {script}")
+        resultado = subprocess.run([
+            sys.executable, script  # ✅ Usar sys.executable
+        ], check=True, capture_output=True, text=True, cwd=os.path.dirname(os.path.abspath(__file__)))
+        
+        if resultado.stdout:
+            print(f"Saída: {resultado.stdout}")
+        return True
+        
+    except subprocess.CalledProcessError as e:
+        print(f"Erro ao executar {script}: Código {e.returncode}")
+        if e.stdout:
+            print(f"Stdout: {e.stdout}")
+        if e.stderr:
+            print(f"Stderr: {e.stderr}")
+        return False
+    except Exception as e:
+        print(f"Erro inesperado ao executar {script}: {e}")
+        return False
 
 if __name__ == "__main__":
-		print("Iniciando automação CNES...")
-		print("1. Baixando o arquivo CSV de estabelecimentos (EstabelecimentosCsvDownload.py)...")
-		if executar_script("EstabelecimentosCsvDownload.py"):
-			print("Arquivo CSV baixado com sucesso!\n")
-			print("2. Buscando dados da API oficial do CNES (BuscarCnesApiOficial.py)...")
-			if executar_script("BuscarCnesApiOficial.py"):
-				print("Dados da API oficial obtidos com sucesso!\n")
-				print("3. Gerando script SQL para atualização do banco (GerarScriptSQLCnes.py)...")
-				if executar_script("GerarScriptSQLCnes.py"):
-					print("Script SQL gerado com sucesso!\n")
-					print("4. Atualizando o banco de dados com os dados processados (UptadeBancoDeDados.py)...")
-					if executar_script("UptadeBancoDeDados.py"):
-						print("Banco de dados atualizado com sucesso!\n")
-						print("Processo de automação CNES finalizado com sucesso!")
-					else:
-						print("[ERRO] Falha ao executar UptadeBancoDeDados.py. Verifique os logs para mais detalhes.")
-				else:
-					print("[ERRO] Falha ao executar GerarScriptSQLCnes.py. Verifique os logs para mais detalhes.")
-			else:
-				print("[ERRO] Falha ao executar BuscarCnesApiOficial.py. Verifique os logs para mais detalhes.")
-		else:
-			print("[ERRO] Falha ao executar EstabelecimentosCsvDownload.py. Verifique os logs para mais detalhes.")
+    print("Iniciando automação CNES...")
+    
+    scripts = [
+        ("EstabelecimentosCsvDownload.py", "Baixando arquivo CSV de estabelecimentos"),
+        ("BuscarCnesApiOficial.py", "Buscando dados da API oficial do CNES"),
+        ("GerarScriptSQLCnes.py", "Gerando script SQL para atualização do banco"),
+        ("UptadeBancoDeDados.py", "Atualizando banco de dados")
+    ]
+    
+    for script, descricao in scripts:
+        print(f"\n{descricao}...")
+        if executar_script(script):
+            print(f"✅ {script} executado com sucesso!")
+        else:
+            print(f"❌ Falha ao executar {script}")
+            print("Parando execução devido ao erro.")
+            sys.exit(1)
+    
+    print("\n🎉 Processo de automação CNES finalizado com sucesso!")
